@@ -96,7 +96,7 @@ Output is contained in one global Result folder:
 
 ## Authors
 
-* **Yacine Badis **
+* ** Yacine Badis **
 
 ## License
 
