@@ -74,12 +74,12 @@ Firstly, and like with any metabarcoding approach, detecting an organism in a lo
 bash ./MOULINETTE.sh QUERY LIST PERCID MAXTARGET READCOVER EVALUE   
 ```
 
-QUERY = fasta query file 
-LIST = name of input list of SRA Runs in txt format (e.g runselector output on ncbi, ERR867907) 
-PERCID = blast identity threshold
-MAXTARGET = maximum number of target sequences in vdb-blast parameter
-READCOVER = percentage read cover for blast Alignment length filtering expressed in decimal (0.8)
-EVALUE = VDB-Blast e-value parameter
+* QUERY = fasta query file 
+* LIST = name of input list of SRA Runs in txt format (e.g runselector output on ncbi, ERR867907) 
+* PERCID = blast identity threshold
+* MAXTARGET = maximum number of target sequences in vdb-blast parameter
+* READCOVER = percentage read cover for blast Alignment length filtering expressed in decimal (0.8)
+* EVALUE = VDB-Blast e-value parameter
 
 ### Results
 
