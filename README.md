@@ -72,7 +72,7 @@ Firstly, and like with any metabarcoding approach, detecting an organism in a lo
 ### Usage
 
 ```
-bash ./MOULINETTE.sh QUERY LIST PERCID MAXTARGET READCOVER EVALUE   
+bash ./SraSST.sh QUERY LIST PERCID MAXTARGET READCOVER EVALUE   
 ```
 
 * QUERY = fasta query file 
