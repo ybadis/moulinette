@@ -1,5 +1,5 @@
 #!/bin/bash
-##	Release v11.4 10-02-18
+##	Release v11.5 24-04-18
 ##	Contact yacinebadis@sams.ac.uk
 
 ########################################################################  
@@ -10,6 +10,9 @@
 #v11.3 maxtargetseq set to 1 in the final NR blast to have only the best hit retrieved and facilitate sorting which OTU are of interest. Users will run global remote blasts themselves using maxtargetseq 10 to get the diversity of best matches
 #v11.3 clustering OTU with Minsize 2 --> Excluding singletons
 #v11.3 took out many * wilcards in the cleanup stage so that cp and mv are more precise, allowing running several instances of the moulinette in the same working directory
+#v11.5 updated GPS extraction, now accepting multiple formats using the dedicated xtract xml parser utility
+#v11.5 only 100 first reads used for computing read length
+
 
 #v10.1 add "sort -u" before each fastq-dump to avoid extractin same read several times
 #
@@ -190,8 +193,8 @@ echo ""##blastn_vdb -db "$i" -query "$QUERY" -outfmt 6 -out ""$QUERY"_vs_"$i".bl
 #############################################################################################################################
 #############################################################################################################################
 ## checking read length to adapt blast align fiter
-echo "estimating mean read length on first 10000 reads"
-	ALNLGT=$(./fastq-dump --split-files --skip-technical -X 10000 -Z $i | grep "length=" | sed 's/ /\t/g'| cut -f3 | sed 's/length=//g' | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'| awk '{print $1 * '"$READCOVER"'}' | cut -f1 -d '.')
+echo "estimating mean read length on first 100 reads"
+	ALNLGT=$(./fastq-dump --split-files --skip-technical -X 100 -Z $i | grep "length=" | sed 's/ /\t/g'| cut -f3 | sed 's/length=//g' | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'| awk '{print $1 * '"$READCOVER"'}' | cut -f1 -d '.')
 	echo "User Setting is" "$READCOVER" ".....SraSST will ONLY select blast alignments over "$ALNLGT"nt" 	
 	echo "~"
 	echo "~"
