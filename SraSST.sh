@@ -94,7 +94,7 @@ echo EVALUE is "$EVALUE"  "Blast evalue parameter"
 echo ""
 echo ""
 echo ""
-while true;
+ while true;
 do
 	echo "YOUR Input order DOES COUNT !!! Check that your numerical variables are properly assigned and that no inversions were made by improper order of inputs."
 	echo ""
@@ -323,8 +323,8 @@ cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired.fastq" | awk 'B
 ##Sort uniq reads
 ./usearch -fastx_uniques "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.filtered.fa" -relabel Uniq -sizeout -fastaout "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.uniques.fa"
 
-##Cluster OTUs  - Option -minsize 1 accepts singleton OTUs - radius 1.5 groups together all reads over 98.5 id
-./usearch -cluster_otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.uniques.fa" -otu_radius_pct 1.5 -minsize 2 -otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" -relabel SraSST-"$ID"-Otu
+##Cluster OTUs  - Option -minsize 1 accepts singleton OTUs - radius 1.5 groups together all reads over 99 id
+./usearch -cluster_otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.uniques.fa" -otu_radius_pct 1 -minsize 2 -otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" -relabel SraSST-"$ID"-Otu
 
 echo "Number of OTUs (including singletons) retrieved by USEARCH for run" "SraSST-"$ID"-"$QUERY"_vs_"$LIST"" 
 OTUS_RETRIEVED=$(cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" | grep '>' | wc -l )
@@ -359,6 +359,16 @@ echo "Final Remote Blast of retrieved OTUs on NR - This might take a while ... u
 blastn -db nr -query "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" -max_target_seqs 1 -outfmt "6" -out "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab" -remote
 
 
+#Extracting organism names from hits retrieved in NR
+cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab" | cut -f2 > "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids"
+
+for s in $(cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids"); do
+ TAXLIN=$(esearch -db nucleotide -query $s | efetch -format xml |xtract -pattern Bioseq -element Textseq-id_accession Seqdesc_title OrgName_lineage Date-std_year | grep "$s")
+ echo "$TAXLIN" >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids-Namelist.txt" 
+ echo "processed "$s""
+done
+
+
 ##Usearch Cleanup
 mkdir "SraSST-"$ID"-usearch"
 mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.fastq" "SraSST-"$ID"-usearch"
@@ -370,8 +380,8 @@ mv SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.* "SraSST-"$ID"-usearch"
 
 ##### FINAL CLEANUP
 ##Redirecting all final results in global result directory
-mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-
+mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids-Namelist.txt" "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
+   
 ##  mv *RblastVsOtu* "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
 mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.besthits.RblastVsOtu.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
 mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.besthits.RblastVsOtu.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
@@ -387,16 +397,20 @@ mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab" "SraSST-"$ID"-"$QUERY"
 mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST".log" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
 mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GlobalResults.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
 mv "SraSST-"$ID"-usearch" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
+
 ###Warn user about cache size 
+ls "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
+
+
 echo "BEWARE OF CACHE USAGE"
 echo "Running cache-mgr"
 cache-mgr -r
 echo "command cache-mgr with option -c to clear you cache - BUT doing so might affect other running instances of SraSST if they share the same ncbi/cache folder"
 echo ""
 echo "Your Whole results are stored in " "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-echo "with the following content:"
-ls "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-
+echo "with the content listed above"
+echo "You can find the best NR hits matching your OTUs in " "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab"
+echo "You can find the Organism dESCRIPTION OF THOSE NR hits matching your OTUs in " "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids-Namelist.txt"
 echo "You can now MAP your new OTUs to GPS coordinates via reciprocal blast on the retrived reads"
 echo "You can also run the tool again using the retrieved unique reads (usearch folder - unique -) to recursively broaden your search"
 echo "You're Welcome :-)"
