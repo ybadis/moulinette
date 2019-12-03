@@ -1,5 +1,5 @@
 #!/bin/bash
-##	Release v11.3 10-04-17
+##	Release v11.4 10-02-18
 ##	Contact yacinebadis@sams.ac.uk
 
 ########################################################################  
@@ -131,7 +131,7 @@ touch  "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired.fastq"
 touch  "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.fastq"
 
 touch "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab"
-	echo "RUN_LATITUDESTART_LONGITUDESTART" >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab"
+	echo "RUNID"_"LATITUDESTART"_"LONGITUDESTART"_"LATITUDE"_"LONGITUDE"_"LATLON"  >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab"
 
 touch "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_counts.tab"
 	echo ""QUERY_RUN_Readcount_LATITUDE_LONGITUDE"" | sed 's/_/\t/g' >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_counts.tab"
@@ -203,7 +203,7 @@ echo "estimating mean read length on first 10000 reads"
 	
 
 	RESULT=$(cat ""$QUERY"_vs_"$i"_alnlgt_ids" | wc -l)
-	echo "$RESULT" "results to retriev
+	echo "$RESULT" "results to retrieve"
 
 	if [[ "$RESULT" -gt 0 ]]; then 
 		#############################################################################################################################
@@ -211,9 +211,14 @@ echo "estimating mean read length on first 10000 reads"
 		##################################################   GPS EXTRACTION  ########################################################
 		#############################################################################################################################
 		#############################################################################################################################
-		LONGITUDE=$(./esearch -db sra -query $i | ./efetch -format native | sed 's/\///g'| sed 's/></\n/g'|uniq | grep -A2 Longitude | grep -A1 Start| grep VAL | sed 's/VALUE>//g'| sed 's/<VALUE//g')
-		LATITUDE=$(./esearch -db sra -query $i | ./efetch -format native | sed 's/\///g'| sed 's/></\n/g'|uniq | grep -A2 Latitude | grep -A1 Start| grep VAL | sed 's/VALUE>//g'| sed 's/<VALUE//g')
-		echo "$i"_"$LATITUDE"_"$LONGITUDE" >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab"
+		LATITUDESTART=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude Start' -element VALUE)
+		LONGITUDESTART=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Longitude Start' -element VALUE)
+		LATITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude' -or 'latitude' -element VALUE)
+		LONGITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Longitude' -or 'longitude' -element VALUE)
+		#the  'geographic location (latitude and longitude)' retrieval is not always working...
+		LATLON=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'lat_lon' -or 'geographic location (latitude and longitude)' -element VALUE)
+
+		echo "$i"_"$LATITUDESTART"_"$LONGITUDESTART"_"$LATITUDE"_"$LONGITUDE"_"$LATLON" >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab"
 		echo "GPS coordinates stored in " "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab"
 	fi
 
@@ -243,7 +248,7 @@ echo "estimating mean read length on first 10000 reads"
 
 ## Emptying cache after each run (could be modified to only keep runs matching query)
 echo "Running cache-mgr"
-cache-mgr -c
+./cache-mgr -c
 
 ##Move blastres table and sorted ids to corresponding RUN folder
 mv ""$QUERY"_vs_"$i"_alnlgt_ids" "SraSST-"$ID"-"$QUERY"_vs_"$i""
@@ -315,8 +320,8 @@ cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired.fastq" | awk 'B
 ##Sort uniq reads
 ./usearch -fastx_uniques "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.filtered.fa" -relabel Uniq -sizeout -fastaout "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.uniques.fa"
 
-##Cluster OTUs  - Option -minsize 1 accepts singleton OTUs - radius 1.5 groups together all reads over 97 id
-./usearch -cluster_otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.uniques.fa" -otu_radius_pct 3 -minsize 2 -otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" -relabel SraSST-"$ID"-Otu
+##Cluster OTUs  - Option -minsize 1 accepts singleton OTUs - radius 1.5 groups together all reads over 98.5 id
+./usearch -cluster_otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.uniques.fa" -otu_radius_pct 1.5 -minsize 2 -otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" -relabel SraSST-"$ID"-Otu
 
 echo "Number of OTUs (including singletons) retrieved by USEARCH for run" "SraSST-"$ID"-"$QUERY"_vs_"$LIST"" 
 OTUS_RETRIEVED=$(cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" | grep '>' | wc -l )
