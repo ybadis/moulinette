@@ -32,6 +32,7 @@
 ##Enter Debug mode (deactivated here)
 #set -x
 
+PATH="/opt/sratoolkit/2.9.6/bin:$PATH"
 
 usage() { 
 	echo "Usage: $0 [-q <fasta>] [-l <list>] [-t <threshold>] [-n <ntarget>] [-p <percentage>] [-e <evalue>] [-o <dir>]" 1>&2
@@ -112,10 +113,6 @@ echo ""
 #############################################################################################################################
 
 
-
-
-
-
 ## Generate uniq SraSST Runid based on date hour min sec - Thi ID will be USED in filename
 ID=$(date | awk '{print $6$2$3$4}' | sed 's/://g' )
 
@@ -171,22 +168,18 @@ echo ""
 #
 #
 ###Actual start of input processing
-#for i in $(cat $LIST); 
-#
-#do
-#
-#	echo "Processing ""$i"
-#	mkdir "SraSST-"$ID"-"$QUERY"_vs_"$i""
-#	echo "creating ""SraSST-"$ID"-"$QUERY"_vs_"$i""
-##############################################################################################################################
-##############################################################################################################################
-###################################################   BLAST   ################################################################
-##############################################################################################################################
-##############################################################################################################################
-###RunBlast
-#echo "Running blastn_vdb"
-#echo ""##blastn_vdb -db "$i" -query "$QUERY" -outfmt 6 -out ""$QUERY"_vs_"$i".blastres.tab" -perc_identity "$PERCID" -max_target_seqs "$MAXTARGET" -evalue "$EVALUE"""
-#./blastn_vdb -db "$i" -query $QUERY -outfmt 6 -out ""$QUERY"_vs_"$i".blastres.tab" -perc_identity $PERCID -max_target_seqs $MAXTARGET  -evalue $EVALUE
+for i in $(cat $LIST); 
+do
+	echo "Processing ""$i"
+	INT_FOLDER=$FOLDER/$i
+	mkdir $INT_FOLDER
+	BLAST_f=$INT_FOLDER/blastres.tab
+	echo "creating "$INT_FOLDER
+	#########  BLAST ###############################
+	echo "Running blastn_vdb"
+	echo ""##blastn_vdb -db "$i" -query "$QUERY" -outfmt 6 -out "$BLAST_f" -perc_identity "$PERCID" -max_target_seqs "$MAXTARGET" -evalue "$EVALUE"""
+	blastn_vdb -db "$i" -query $QUERY -outfmt 6 -out "$BLAST_f" -perc_identity $PERCID -max_target_seqs $MAXTARGET  -evalue $EVALUE
+done
 #
 ##############################################################################################################################
 ##############################################################################################################################
@@ -249,7 +242,7 @@ echo ""
 #
 #
 #	done
-#
+
 ### Emptying cache after each run (could be modified to only keep runs matching query)
 #echo "Running cache-mgr"
 #./cache-mgr -c
