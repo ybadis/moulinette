@@ -33,6 +33,13 @@
 #set -x
 
 PATH="/opt/sratoolkit/2.9.6/bin:$PATH"
+PATH="/opt/edirect:$PATH"
+#PATH="/opt/usearch/9.1.13:$PATH"
+PATH="/opt/usearch/9.2.64:$PATH"
+#PATH="/opt/usearch/11.0.667:$PATH"
+PATH="/opt/ncbi-blast/2.9.0/bin:$PATH"
+
+NTHREADS=16
 
 usage() { 
 	echo "Usage: $0 [-q <fasta>] [-l <list>] [-t <threshold>] [-n <ntarget>] [-p <percentage>] [-e <evalue>] [-o <dir>]" 1>&2
@@ -108,7 +115,7 @@ echo Continuing ...
 echo ""
 echo ""
 
-
+start=`date +%s`  #Measuring time
 
 #############################################################################################################################
 
@@ -121,14 +128,33 @@ ID=$(date | awk '{print $6$2$3$4}' | sed 's/://g' )
 QUERY_f="query"
 #LIST_f="$(basename -- $LIST)"
 LIST_f="list"
-FILENAME="SraSST-"$ID"-"$QUERY_f"_vs_"$LIST_f
-echo $FILENAME
-FOLDER=$OUTPUTDIR"/"$FILENAME
+RUN="SraSST-"$ID"-"$QUERY_f"_vs_"$LIST_f
+echo $RUN
+FOLDER=$OUTPUTDIR"/"$RUN
 mkdir -p $FOLDER
 echo Creating result directory: $FOLDER
 
 PAIRED_READS_f=$FOLDER/"All-retrieved-reads-paired.fastq"; touch $PAIRED_READS_f
 UNPAIRED_READS_f=$FOLDER/"All-retrieved-reads-nonpaired.fastq"; touch $UNPAIRED_READS_f
+UNPAIRED_READS_fa=$FOLDER/"All-retrieved-reads-nonpaired.fasta"
+PAIRED_READS_R1_f=$FOLDER/"All-retrieved-reads-paired_R1.fastq";
+PAIRED_READS_R1_fa=$FOLDER/"All-retrieved-reads-paired_R1.fasta";
+PAIRED_READS_R2_f=$FOLDER/"All-retrieved-reads-paired_R2.fastq";
+PAIRED_READS_R2_fa=$FOLDER/"All-retrieved-reads-paired_R2.fasta";
+UNPAIRED_RETRIEVED_READS=$FOLDER/"All-retrieved-reads-nonpaired.besthits.RblastVsOtu.tab"
+PAIRED_RETRIEVED_READS_R1=$FOLDER/"All-retrieved-reads-paired_R1.besthits.RblastVsOtu.tab"
+PAIRED_RETRIEVED_READS_R2=$FOLDER/"All-retrieved-reads-paired_R2.besthits.RblastVsOtu.tab"
+
+USEARCH_merged_f=$FOLDER/"usearch.merged.fq";
+USEARCH_merged_fa=$FOLDER/"usearch.merged.fa";
+USEARCH_merged_RETRIEVED=$FOLDER/"usearch.merged.besthits.RblastVsOtu.tab";
+USEARCH_filtered_f=$FOLDER/"usearch.filtered.fa";
+USEARCH_uniques_f=$FOLDER/"usearch.uniques.fa";
+USEARCH_otus_f=$FOLDER/"usearch.otus.fa";
+USEARCH_RETRIEVED=$FOLDER/"usearch.otus.NRBlast.tab";
+USEARCH_otus_GIDS=$FOLDER/"usearch.otus.NRBlast.gids";
+USEARCH_otus_GIDS_NAME=$FOLDER/"usearch.otus.NRBlast.gids-Namelist.txt";
+
 GPS_f=$FOLDER/"GPS_coordinates.tab"; touch $GPS_f
 COUNTS_f=$FOLDER/"counts.tab"; touch $COUNTS_f
 GLOBAL_f=$FOLDER/"GlobalResults.tab"; touch $GLOBAL_f
@@ -173,240 +199,196 @@ do
 	echo "Processing ""$i"
 	INT_FOLDER=$FOLDER/$i
 	mkdir $INT_FOLDER
-	BLAST_f=$INT_FOLDER/blastres.tab
-	echo "creating "$INT_FOLDER
-	#########  BLAST ###############################
-	echo "Running blastn_vdb"
-	echo ""##blastn_vdb -db "$i" -query "$QUERY" -outfmt 6 -out "$BLAST_f" -perc_identity "$PERCID" -max_target_seqs "$MAXTARGET" -evalue "$EVALUE"""
-	blastn_vdb -db "$i" -query $QUERY -outfmt 6 -out "$BLAST_f" -perc_identity $PERCID -max_target_seqs $MAXTARGET  -evalue $EVALUE
-done
-#
-##############################################################################################################################
-##############################################################################################################################
-###################################################   READCOVER FILTER  ######################################################
-##############################################################################################################################
-##############################################################################################################################
-### checking read length to adapt blast align fiter
-#echo "estimating mean read length on first 100 reads"
-#	ALNLGT=$(./fastq-dump --split-files --skip-technical -X 100 -Z $i | grep "length=" | sed 's/ /\t/g'| cut -f3 | sed 's/length=//g' | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'| awk '{print $1 * '"$READCOVER"'}' | cut -f1 -d '.')
-#	echo "User Setting is" "$READCOVER" ".....SraSST will ONLY select blast alignments over "$ALNLGT"nt" 	
-#	echo "~"
-#	echo "~"
-#	echo "~"
-###Filter results based on blast align filter 
-#	#print blastres with aligntlengt filter criteria and extracts hit name (e.g SRA:ERR867907.21038.2) to deduce sra run spot (or read) id number (e.g 21038)
-#	cat "${QUERY}_vs_$i.blastres.tab" | awk ' $4 >= '"$ALNLGT"' ' | cut -f2 | tr : '\t' | tr . '\t' | cut -f3 | sort -u > ""$QUERY"_vs_"$i"_alnlgt_ids"
-#
-#	
-#
-#	RESULT=$(cat ""$QUERY"_vs_"$i"_alnlgt_ids" | wc -l)
-#	echo "$RESULT" "results to retrieve"
-#
-#	if [[ "$RESULT" -gt 0 ]]; then 
-#		#############################################################################################################################
-#		#############################################################################################################################
-#		##################################################   GPS EXTRACTION  ########################################################
-#		#############################################################################################################################
-#		#############################################################################################################################
-#		LATITUDESTART=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude Start' -element VALUE)
-#		LONGITUDESTART=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Longitude Start' -element VALUE)
-#		LATITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude' -or 'latitude' -element VALUE)
-#		LONGITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Longitude' -or 'longitude' -element VALUE)
-#		#the  'geographic location (latitude and longitude)' retrieval is not always working...
-#		LATLON=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'lat_lon' -or 'geographic location (latitude and longitude)' -element VALUE)
-#
-#		echo "$i"_"$LATITUDESTART"_"$LONGITUDESTART"_"$LATITUDE"_"$LONGITUDE"_"$LATLON" >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab"
-#		echo "GPS coordinates stored in " "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab"
-#	fi
-#
-##############################################################################################################################
-##############################################################################################################################
-###################################################   READ EXTRACTION   ######################################################
-##############################################################################################################################
-##############################################################################################################################
-#	for k in $(cat ""$QUERY"_vs_"$i"_alnlgt_ids"); do
-#	##Fetch retrieved individual fastq read pairs
-#		./fastq-dump --split-files --skip-technical -N $k -X $k -Z $i > "SraSST-"$ID"-"$QUERY"_vs_"$i""/""$i"."$k".fastq-dump"
-#	##Add the above to global result fastq file
-#		READNUMB=$(cat "SraSST-"$ID"-"$QUERY"_vs_"$i""/""$i"."$k".fastq-dump" | grep $i | grep @ | wc -l)
-#	if [[ "$READNUMB" -eq  2 ]] ; then
-#		cat "SraSST-"$ID"-"$QUERY"_vs_"$i""/""$i"."$k".fastq-dump" >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired.fastq"
-#	else 
-#		cat "SraSST-"$ID"-"$QUERY"_vs_"$i""/""$i"."$k".fastq-dump" >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.fastq"
-#	fi
-#	##Append GPS info to blast results to create the Global Read Detail Table
-#	cat "${QUERY}_vs_$i.blastres.tab" | grep "$i"."$k" |  awk ' {print $1"\t"$2"\t" $3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\t"$10"\t"$11"\t"$12"\t" "'$i'" "\t" "'$k'" "\t" "'$LONGITUDE'" "\t" "'$LATITUDE'"}' >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GlobalResults.tab"
-#	##Disabled here ##### Convert to fasta
-#		#cat "SraSST-"$ID"-"$QUERY"_vs_"$i""/""$i"."$k".fastq-dump" | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > "SraSST-"$ID"-"$QUERY"_vs_"$i""/"""$i"."$k".fastq-dump.fasta""
-#
-#
-#
-#	done
+	echo "creating "$INT_FOLDER >> $LOG_f
 
-### Emptying cache after each run (could be modified to only keep runs matching query)
-#echo "Running cache-mgr"
-#./cache-mgr -c
-#
-###Move blastres table and sorted ids to corresponding RUN folder
-#mv ""$QUERY"_vs_"$i"_alnlgt_ids" "SraSST-"$ID"-"$QUERY"_vs_"$i""
-#
-#mv "${QUERY}_vs_$i.blastres.tab" "SraSST-"$ID"-"$QUERY"_vs_"$i""
-#
-###Check if file does not contain any fastq file (e.g. no reads were extracted), and delete if true
-#ls SraSST-"$ID"-"$QUERY"_vs_"$i" | grep *fastq-dump
-#if [[ $? -ne 0 ]]; then
-#	rm -r "SraSST-"$ID"-"$QUERY"_vs_"$i""
-#	echo  "$i"" SORRY!! No hits retrieved in this Run " 
-#	echo  "$i"" SORRY!! No hits retrieved in this Run " >> $LOG_f
-#	echo "" 
-#	echo "" 
-#	echo "" 
-#
-#else                                        
-#	echo "$i" "HITs found for this Run!!!"
-#	echo "$i" "HITs found for this Run!!!" >> $LOG_f
-#	echo "" 
-#
-#
-#
-###Feed estimate of results to global result file
-#y="$(ls "SraSST-"$ID"-"$QUERY"_vs_"$i"" | wc -l)"
-#	## minus 2 to uncount blastid and blastres files --> count indiv reads fastq files
-#	let "y -= 2"
-#	echo ""$QUERY"_"$i"_"$y"_"$LATITUDE"_"$LONGITUDE"" | sed 's/_/\t/g' >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_counts.tab"
-#
-###MoveIndividualRunFolder to main Search directory
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$i"" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#
-#fi
-#
-#done
-#
-##############################################################################################################################
-##############################################################################################################################
+	##########  BLAST ###############################
+	
+	echo "Running blastn_vdb"
+	BLAST_f=$INT_FOLDER/blastres.tab
+	echo ""##blastn_vdb -db "$i" -query "$QUERY" -outfmt 6 -out "$BLAST_f" -perc_identity "$PERCID" -max_target_seqs "$MAXTARGET" -evalue "$EVALUE""" >> $LOG_f
+	blastn_vdb -db "$i" -num_threads $NTHREADS -query $QUERY -outfmt 6 -out "$BLAST_f" -perc_identity $PERCID -max_target_seqs $MAXTARGET  -evalue $EVALUE &> $LOG_f
+
+	##########  READCOVER FILTER  ####################
+
+	# checking read length to adapt blast align fiter
+	echo "estimating mean read length on first 100 reads"
+	ALNLGT=$(fastq-dump --split-files --skip-technical -X 100 -Z $i | grep "length=" | sed 's/ /\t/g'| cut -f3 | sed 's/length=//g' | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'| awk '{print $1 * '"$READCOVER"'}' | cut -f1 -d '.')
+	echo "User Setting is" "$READCOVER" ".....SraSST will ONLY select blast alignments over "$ALNLGT"nt" 	
+	echo "~"
+	echo "~"
+	echo "~"
+	# Filter results based on blast align filter 
+#	#print blastres with aligntlengt filter criteria and extracts hit name
+#	(e.g SRA:ERR867907.21038.2) to deduce sra run spot (or read) id number
+#	(e.g 21038)
+	ALNLGT_f=$INT_FOLDER/"alnlgt_ids"
+	cat "$BLAST_f" | awk ' $4 >= '"$ALNLGT"' ' | cut -f2 | tr : '\t' | tr . '\t' | cut -f3 | sort -u > $ALNLGT_f
+
+	RESULT=$(cat "$ALNLGT_f" | wc -l)
+	echo "$RESULT" "results to retrieve"
+
+#	############   GPS EXTRACTION  ####################
+	if [[ "$RESULT" -gt 0 ]]; then
+		LATITUDESTART=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude Start' -element VALUE)
+		LONGITUDESTART=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Longitude Start' -element VALUE)
+		LATITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude' -or 'latitude' -element VALUE)
+		LONGITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Longitude' -or 'longitude' -element VALUE)
+		#the  'geographic location (latitude and longitude)' retrieval is not always working...
+		LATLON=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'lat_lon' -or 'geographic location (latitude and longitude)' -element VALUE)
+
+		echo "$i"_"$LATITUDESTART"_"$LONGITUDESTART"_"$LATITUDE"_"$LONGITUDE"_"$LATLON" >> $GPS_f
+		echo "GPS coordinates stored in "$GPS_f
+	fi
+
+	##########   READ EXTRACTION   ##################### 
+	for k in $(cat "$ALNLGT_f"); do
+		FASTQ_f=$INT_FOLDER/$i.$k.fastq-dump
+		
+		#Fetch retrieved individual fastq read pairs
+		fastq-dump --split-files --skip-technical -N $k -X $k -Z $i > $FASTQ_f
+
+		#Add the above to global result fastq file
+		READNUMB=$(cat "$FASTQ_f" | grep $i | grep @ | wc -l)
+		if [[ "$READNUMB" -eq  2 ]] ; then
+			cat $FASTQ_f >> $PAIRED_READS_f
+		else 
+			cat $FASTQ_f >> $UNPAIRED_READS_f
+		fi
+		##Append GPS info to blast results to create the Global Read Detail Table
+		cat "$BLAST_f" | grep "$i"."$k" |  awk ' {print $1"\t"$2"\t" $3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\t"$10"\t"$11"\t"$12"\t" "'$i'" "\t" "'$k'" "\t" "'$LONGITUDE'" "\t" "'$LATITUDE'"}' >> $GLOBAL_f
+		##Disabled here ##### Convert to fasta
+		cat $FASTQ_f | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > $FASTQ_f.fasta
+	done
+
+
+	### Emptying cache after each run (could be modified to only keep runs matching query)
+	echo "Running cache-mgr"
+	cache-mgr -c
+	
+	###Check if file does not contain any fastq file (e.g. no reads were extracted), and delete if true
+	echo $INT_FOLDER
+	ls "$INT_FOLDER" | grep fastq-dump
+	if [[ $? -ne 0 ]]; then
+		#rm -r "$INT_FOLDER"
+		echo  "$i"" SORRY!! No hits retrieved in this Run " 
+		echo  "$i"" SORRY!! No hits retrieved in this Run " >> $LOG_f
+		echo "" 
+	else                                        
+		echo "$i" "HITs found for this Run!!!"
+		echo "$i" "HITs found for this Run!!!" >> $LOG_f
+		echo "" 
+	
+		##Feed estimate of results to global result file
+		y="$(ls "$INT_FOLDER" | wc -l)"
+		## minus 2 to uncount blastid and blastres files --> count indiv reads fastq files
+		let "y -= 2"
+		echo ""$QUERY"_"$i"_"$y"_"$LATITUDE"_"$LONGITUDE"" | sed 's/_/\t/g' >> $COUNTS_f
+	fi
+done
+
+
+
 ###################################################   OTU SEARCH   ###########################################################
-##############################################################################################################################
-##############################################################################################################################
 #
 ###Manual creation of global fastq file --> creating R1 and R2 file
 #
-#echo "" 
-#echo "" 
-#echo "" 
-#echo "LAUNCHING USEARCH OTU CALLING (Default parameters accept singletons)"
-#echo "" 
-#echo "" 
-#echo "" 
-#
-#cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired.fastq" | awk 'BEGIN {OFS = "\n"} {header1 = $0 ;
-# getline seq1 ; getline qheader1 ; getline qseq1; getline header2; getline seq2; getline qheader2; getline qseq2 ;
-#  {print header1, seq1, qheader1, qseq1}}' > "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.fastq"
-#
-#cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired.fastq" | awk 'BEGIN {OFS = "\n"} {header1 = $0 ;
-# getline seq1 ; getline qheader1 ; getline qseq1; getline header2; getline seq2; getline qheader2; getline qseq2 ;
-#  {print header2, seq2, qheader2, qseq2}}' > "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R2.fastq"
-#
-#
-# ##Merge read pairs
-#./usearch -fastq_mergepairs "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.fastq" -fastqout "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.merged.fq"
-### if "Label Mismatch error" the mentionned reads dont have their respective R1 or R2 mate, you'll have to delete them before OTU calling"
-#
-###Standard usearch filtering parameters
-#./usearch -fastq_filter "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.merged.fq" -fastq_maxee 1.0  -fastaout "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.filtered.fa"
-#
-###Sort uniq reads
-#./usearch -fastx_uniques "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.filtered.fa" -relabel Uniq -sizeout -fastaout "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.uniques.fa"
-#
-###Cluster OTUs  - Option -minsize 1 accepts singleton OTUs - radius 1.5 groups together all reads over 99 id
-#./usearch -cluster_otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.uniques.fa" -otu_radius_pct 1 -minsize 2 -otus "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" -relabel SraSST-"$ID"-Otu
-#
-#echo "Number of OTUs (including singletons) retrieved by USEARCH for run" "SraSST-"$ID"-"$QUERY"_vs_"$LIST"" 
-#OTUS_RETRIEVED=$(cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" | grep '>' | wc -l )
-#echo $OTUS_RETRIEVED
-#
-###Add number of dertemined OTUs to Logfile
-#echo "Number of OTUs (including singletons) retrieved by USEARCH for run" "SraSST-"$ID"-"$QUERY"_vs_"$LIST"" >> $LOG_f
-#echo $OTUS_RETRIEVED >> $LOG_f
-#
-###Build custom blastdb based on retrieved OTUs
+echo "" 
+echo "" 
+echo "" 
+echo "LAUNCHING USEARCH OTU CALLING (Default parameters accept singletons)"
+echo "" 
+echo "" 
+echo "" 
+
+
+cat $PAIRED_READS_f | awk 'BEGIN {OFS = "\n"} {header1 = $0 ;
+ getline seq1 ; getline qheader1 ; getline qseq1; getline header2; getline seq2; getline qheader2; getline qseq2 ;
+  {print header1, seq1, qheader1, qseq1}}' > $PAIRED_READS_R1_f
+
+cat $PAIRED_READS_f | awk 'BEGIN {OFS = "\n"} {header1 = $0 ;
+ getline seq1 ; getline qheader1 ; getline qseq1; getline header2; getline seq2; getline qheader2; getline qseq2 ;
+  {print header2, seq2, qheader2, qseq2}}' > $PAIRED_READS_R2_f
+
+
+##Merge read pairs
+usearch -fastq_mergepairs $PAIRED_READS_R1_f -fastqout $USEARCH_merged_f
+
+#if "Label Mismatch error" the mentionned reads dont have their respective R1
+#or R2 mate, you'll have to delete them before OTU calling"
+
+##Standard usearch filtering parameters
+usearch -fastq_filter $USEARCH_merged_f -fastq_maxee 1.0 -fastaout $USEARCH_filtered_f
+
+##Sort uniq reads
+usearch -fastx_uniques $USEARCH_filtered_f -relabel Uniq -sizeout -fastaout $USEARCH_uniques_f
+
+##Cluster OTUs  - Option -minsize 1 accepts singleton OTUs - radius 1.5 groups together all reads over 99 id
+usearch -cluster_otus $USEARCH_uniques_f -otu_radius_pct 1 -minsize 2 -otus $USEARCH_otus_f -relabel SraSST-"$ID"-Otu
+
+echo "Number of OTUs (including singletons) retrieved by USEARCH for run " $FOLDER  
+OTUS_RETRIEVED=$(cat $USEARCH_otus_f | grep '>' | wc -l )
+echo $OTUS_RETRIEVED
+
+##Add number of dertemined OTUs to Logfile
+echo "Number of OTUs (including singletons) retrieved by USEARCH for run "$RUN >> $LOG_f
+echo $OTUS_RETRIEVED >> $LOG_f
+
+##Build custom blastdb based on retrieved OTUs
 ###########Build future query fasta files
-#cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.fastq" | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.fasta"
-#cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.fastq" | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.fasta"
-#cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R2.fastq" | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R2.fasta"
-#cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.merged.fq" | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.merged.fasta"
-#
-#mkdir SraSSTblastdb # create global blastdb directory in the SraSST workspace, will include the db of differnt runs called by their IDs
-#
-#makeblastdb -in "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" -dbtype nucl -title SraSST-"$ID"-otus -out SraSSTblastdb/SraSST-"$ID"-otus -parse_seqids
-#
+cat $UNPAIRED_READS_f | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > $UNPAIRED_READS_fa
+cat $PAIRED_READS_R1_f | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > $PAIRED_READS_R1_fa
+cat $PAIRED_READS_R2_f | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > $PAIRED_READS_R2_fa
+cat $USEARCH_merged_f | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > $USEARCH_merged_fa
+
+
+
+# create global blastdb directory in the SraSST workspace, will include the db of differnt runs called by their IDs
+DBFOLDER=$FOLDER/SraSSTblastdb
+mkdir $DBFOLDER
+TITLE=SraSST-"$ID"-otus
+BLASTDB_ID=$DBFOLDER/$TITLE
+
+makeblastdb -in $USEARCH_otus_f -dbtype nucl -title $TITLE -out $BLASTDB_ID -parse_seqids
+
+
 ###########Launch blasts with each query file
-#blastn -db SraSSTblastdb/SraSST-"$ID"-otus -query "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.fasta" -max_target_seqs 1 -outfmt "6" -out "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.besthits.RblastVsOtu.tab"
-#blastn -db SraSSTblastdb/SraSST-"$ID"-otus -query "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.fasta" -max_target_seqs 1 -outfmt "6" -out "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.besthits.RblastVsOtu.tab"
-#blastn -db SraSSTblastdb/SraSST-"$ID"-otus -query "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R2.fasta" -max_target_seqs 1 -outfmt "6" -out "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R2.besthits.RblastVsOtu.tab"
-#blastn -db SraSSTblastdb/SraSST-"$ID"-otus -query  "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.merged.fasta" -outfmt "6" -max_target_seqs 1 -out "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.merged.besthits.RblastVsOtu.tab"
-#
+blastn -num_threads $NTHREADS -db $BLASTDB_ID -query $UNPAIRED_READS_fa -max_target_seqs 1 -outfmt "6" -out $UNPAIRED_RETRIEVED_READS
+blastn -num_threads $NTHREADS -db $BLASTDB_ID -query $PAIRED_READS_R1_fa -max_target_seqs 1 -outfmt "6" -out $PAIRED_RETRIEVED_READS_R1
+blastn -num_threads $NTHREADS -db $BLASTDB_ID -query $PAIRED_READS_R2_fa -max_target_seqs 1 -outfmt "6" -out $PAIRED_RETRIEVED_READS_R2
+blastn -num_threads $NTHREADS -db $BLASTDB_ID -query  $USEARCH_merged_fa -outfmt "6" -max_target_seqs 1 -out $USEARCH_merged_RETRIEVED
+
+
 ##Remote Blast of retrieved OTUs via nr - best hits in nr
-#echo ""
-#echo ""
-#echo ""
-#echo "Final Remote Blast of retrieved OTUs on NR - This might take a while ... up to 10 minutes"
-#blastn -db nr -query "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.otus.fa" -max_target_seqs 1 -outfmt "6" -out "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab" -remote
-#
-#
+
+echo "Final Remote Blast of retrieved OTUs on NR - This might take a while ... up to 10 minutes"
+BLASTDB=/media/data/BLASTDB
+#blastn -db nr -query $USEARCH_otus_f -max_target_seqs 1 -outfmt "6" -out $USEARCH_RETRIEVED -remote
+blastn -db nr -num_threads $NTHREADS -query $USEARCH_otus_f -max_target_seqs 1 -outfmt "6" -out $USEARCH_RETRIEVED
+
 ##Extracting organism names from hits retrieved in NR
-#cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab" | cut -f2 > "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids"
-#
-#for s in $(cat "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids"); do
-# TAXLIN=$(esearch -db nucleotide -query $s | efetch -format xml |xtract -pattern Bioseq -element Textseq-id_accession Seqdesc_title OrgName_lineage Date-std_year | grep "$s")
-# echo "$TAXLIN" >> "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids-Namelist.txt" 
-# echo "processed "$s""
-#done
-#
-#
-###Usearch Cleanup
-#mkdir "SraSST-"$ID"-usearch"
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.fastq" "SraSST-"$ID"-usearch"
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R2.fastq" "SraSST-"$ID"-usearch"
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.fasta" "SraSST-"$ID"-usearch"
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R2.fasta" "SraSST-"$ID"-usearch"
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.merged.fasta" "SraSST-"$ID"-usearch"
-#mv SraSST-"$ID"-"$QUERY"_vs_"$LIST"_usearch.* "SraSST-"$ID"-usearch" 
-#
-###### FINAL CLEANUP
-###Redirecting all final results in global result directory
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids-Namelist.txt" "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#   
-###  mv *RblastVsOtu* "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.besthits.RblastVsOtu.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R1.besthits.RblastVsOtu.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired_R2.besthits.RblastVsOtu.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.merged.besthits.RblastVsOtu.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#
-#
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-paired.fastq" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.fastq" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_All-retrieved-reads-nonpaired.fasta" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_counts.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GPS_coordinates.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv $LOG_f "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_GlobalResults.tab" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#mv "SraSST-"$ID"-usearch" "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#
+cat $USEARCH_RETRIEVED | cut -f2 > $USEARCH_otus_GIDS
+
+for s in $(cat $USEARCH_otus_GIDS); do
+ TAXLIN=$(esearch -db nucleotide -query $s | efetch -format xml |xtract -pattern Bioseq -element Textseq-id_accession Seqdesc_title OrgName_lineage Date-std_year | grep "$s")
+ echo "$TAXLIN" >> $USEARCH_otus_GIDS_NAME 
+ echo "processed "$s""
+done
+
+
 ####Warn user about cache size 
-#ls "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#
-#
-#echo "BEWARE OF CACHE USAGE"
-#echo "Running cache-mgr"
-#cache-mgr -r
-#echo "command cache-mgr with option -c to clear you cache - BUT doing so might affect other running instances of SraSST if they share the same ncbi/cache folder"
-#echo ""
-#echo "Your Whole results are stored in " "SraSST-"$ID"-"$QUERY"_vs_"$LIST""
-#echo "with the content listed above"
-#echo "You can find the best NR hits matching your OTUs in " "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.tab"
-#echo "You can find the Organism dESCRIPTION OF THOSE NR hits matching your OTUs in " "SraSST-"$ID"-"$QUERY"_vs_"$LIST"_u_search.otus.NRBlast.gids-Namelist.txt"
-#echo "You can now MAP your new OTUs to GPS coordinates via reciprocal blast on the retrived reads"
-#echo "You can also run the tool again using the retrieved unique reads (usearch folder - unique -) to recursively broaden your search"
-#echo "You're Welcome :-)"
-#
-#exit 0
+end=`date +%s`
+runtime=$((end-start))
+echo "Moulinette runtime: "$runtime
+echo "BEWARE OF CACHE USAGE"
+echo "Running cache-mgr ..."
+cache-mgr -r
+echo "command cache-mgr with option -c to clear you cache - BUT doing so might affect other running instances of SraSST if they share the same ncbi/cache folder."
+echo "Your results are stored in "$FOLDER
+echo "with the content listed above"
+echo "You can find the best NR hits matching your OTUs in " $USEARCH_RETRIEVED
+echo "You can find the Organism dESCRIPTION OF THOSE NR hits matching your OTUs in " $USEARCH_otus_GIDS_NAME
+echo "You can now MAP your new OTUs to GPS coordinates via reciprocal blast on the retrived reads"
+echo "You can also run the tool again using the retrieved unique reads (usearch folder - unique -) to recursively broaden your search"
+echo "You're Welcome :-)"
+
+exit 0
