@@ -39,10 +39,10 @@ PATH="/opt/usearch/9.2.64:$PATH"
 #PATH="/opt/usearch/11.0.667:$PATH"
 PATH="/opt/ncbi-blast/2.9.0/bin:$PATH"
 
-NTHREADS=16
+NTHREADS=1
 
 usage() { 
-	echo "Usage: $0 [-q <fasta>] [-l <list>] [-t <threshold>] [-n <ntarget>] [-p <percentage>] [-e <evalue>] [-o <dir>]" 1>&2
+	echo "Usage: $0 [-q <fasta>] [-l <list>] [-t <threshold>] [-n <ntarget>] [-p <percentage>] [-e <evalue>] [-o <dir>] [-m <nthreads>]" 1>&2
 	echo "fasta: file e.g. Ectrogella or Olpidiopsis"
 	echo "list: name of input list of sra RUN in txt format (e.g runselector output on ncbi, e.g ERR867907 and many others)"
 	echo "threshold: blast identity threshold"
@@ -51,11 +51,11 @@ usage() {
 	echo "evalue: Blast evalue parameter"
 	echo "dir: output directory"
 	echo "Usage example for metabarcoding:"
-        echo "./SraSST.sh -q query.fa -l runlist.txt -t 98.5 -n 100 -p 0.8 -e 1e-100 -o out"
+        echo "./SraSST.sh -q query.fa -l runlist.txt -t 98.5 -n 100 -p 0.8 -e 1e-100 -o out -m 16"
 	exit 1
 }
 
-while getopts ":h:q:l:t:n:p:e:o:" o; do
+while getopts ":h:q:l:t:n:p:e:o:m:" o; do
     case "${o}" in
 	q) QUERY=${OPTARG};; # fasta file e.g. Ectrogella or Olpidiopsis
         l) LIST=${OPTARG} ;; # name of input list of sra RUN in txt format (e.g runselector output on ncbi, e.g ERR867907)
@@ -64,6 +64,7 @@ while getopts ":h:q:l:t:n:p:e:o:" o; do
         p) READCOVER=${OPTARG} ;; # percentage read cover for blast algntlgt filter expressed in decimal e.g 0.8
         e) EVALUE=${OPTARG} ;; #  Blast evalue parameter
         o) OUTPUTDIR=${OPTARG} ; mkdir -p $OUTPUTDIR;; #  Outputdir
+        m) NTHREADS=${OPTARG} ;; #  Number of threads
 	\?) echo "Invalid option: -$OPTARG" >&2;exit ;;
         *) usage ;;
     esac
@@ -361,9 +362,11 @@ blastn -num_threads $NTHREADS -db $BLASTDB_ID -query  $USEARCH_merged_fa -outfmt
 ##Remote Blast of retrieved OTUs via nr - best hits in nr
 
 echo "Final Remote Blast of retrieved OTUs on NR - This might take a while ... up to 10 minutes"
-BLASTDB=/media/data/BLASTDB
-#blastn -db nr -query $USEARCH_otus_f -max_target_seqs 1 -outfmt "6" -out $USEARCH_RETRIEVED -remote
-blastn -db nr -num_threads $NTHREADS -query $USEARCH_otus_f -max_target_seqs 1 -outfmt "6" -out $USEARCH_RETRIEVED
+blastn -db nr -query $USEARCH_otus_f -max_target_seqs 1 -outfmt "6" -out $USEARCH_RETRIEVED -remote
+
+
+#BLASTDB=/media/data/BLASTDB
+#blastn -db nr -num_threads $NTHREADS -query $USEARCH_otus_f -max_target_seqs 1 -outfmt "6" -out $USEARCH_RETRIEVED
 
 ##Extracting organism names from hits retrieved in NR
 cat $USEARCH_RETRIEVED | cut -f2 > $USEARCH_otus_GIDS
