@@ -39,7 +39,8 @@ PATH="/opt/usearch/9.2.64:$PATH"
 #PATH="/opt/usearch/11.0.667:$PATH"
 PATH="/opt/ncbi-blast/2.9.0/bin:$PATH"
 
-NTHREADS=1
+NTHREADS=16
+#MM -> change the default THREADS number from 1 to 16
 
 usage() { 
 	echo "Usage: $0 [-q <fasta>] [-l <list>] [-t <threshold>] [-n <ntarget>] [-p <percentage>] [-e <evalue>] [-o <dir>] [-m <nthreads>]" 1>&2
@@ -57,7 +58,7 @@ usage() {
 
 while getopts ":h:q:l:t:n:p:e:o:m:" o; do
     case "${o}" in
-	q) QUERY=${OPTARG};; # fasta file e.g. Ectrogella or Olpidiopsis
+        q) QUERY=${OPTARG} ;; # fasta file e.g. Ectrogella or Olpidiopsis
         l) LIST=${OPTARG} ;; # name of input list of sra RUN in txt format (e.g runselector output on ncbi, e.g ERR867907)
         t) PERCID=${OPTARG} ;; # blast identity threshold
         n) MAXTARGET=${OPTARG} ;; # max number of target sequences in blast parameter
@@ -88,7 +89,7 @@ echo EVALUE is "$EVALUE"  "Blast evalue parameter"
 echo OUTPUT Folder is "$OUTPUTDIR"
 echo ""
 echo ""
-echo Launching SraSST RUN with "$RUNCOUNT" sra runs and $QUERYNB fasta query sequence-s
+echo Launching SraSST RUN with "$RUNCOUNT" sra runs and $QUERYNB fasta query sequences
 echo In Our hands, a single metagenomic run can typically take 0 to 15 min to scan with 9 queries
 echo THIS MIGHT BE LONG ...
 echo ""
@@ -99,7 +100,7 @@ do
 	echo "Please check your input variables."
 	echo ""
 	echo ""
-	echo -n " Do you wish to proceed? Please confirm (y or n) :"
+	echo -n "Do you wish to proceed? Please confirm (y or n) :"
 	read CONFIRM
 	case $CONFIRM in
 		y|Y|YES|yes|Yes) break ;;
@@ -161,10 +162,13 @@ COUNTS_f=$FOLDER/"counts.tab"; touch $COUNTS_f
 GLOBAL_f=$FOLDER/"GlobalResults.tab"; touch $GLOBAL_f
 LOG_f=$FOLDER/"logs.log"; touch $LOG_f
 
-echo "RUNID"_"LATITUDESTART"_"LONGITUDESTART"_"LATITUDE"_"LONGITUDE"_"LATLON" >> $GPS_f
-echo ""QUERY_RUN_Readcount_LATITUDE_LONGITUDE"" | sed 's/_/\t/g' >> $GPS_f
-echo Query_READID_PERCID_ALNLGT_MISM_GAP_QSTART_QEND_SbSTART_SbEND_EVAL_BITSCORE_RUN_READ_LONGITUDE_LATITUDE | sed 's/_/\t/g' >> $GLOBAL_f
+#echo "RUNID"_"LATITUDESTART"_"LONGITUDESTART"_"LATITUDE"_"LONGITUDE"_"LATLON" >> $GPS_f
+#echo ""QUERY_RUN_Readcount_LATITUDE_LONGITUDE"" | sed 's/_/\t/g' >> $GPS_f
+#echo Query_READID_PERCID_ALNLGT_MISM_GAP_QSTART_QEND_SbSTART_SbEND_EVAL_BITSCORE_RUN_READ_LONGITUDE_LATITUDE | sed 's/_/\t/g' >> $GLOBAL_f
 
+echo "RUNID_LATITUDE LONGITUDE" | sed 's/_/\t/g' >> $GPS_f
+echo "QUERY_RUNID_Readcount_LATITUDE LONGITUDE" | sed 's/_/\t/g' >> $COUNTS_f
+echo "Query_READID_PERCID_ALNLGT_MISM_GAP_QSTART_QEND_SbSTART_SbEND_EVAL_BITSCORE_RUN_READ_LONGITUDE LATITUDE" | sed 's/_/\t/g' >> $GLOBAL_f
 
 # Save Original Input for future reference
 
@@ -230,16 +234,19 @@ do
 
 #	############   GPS EXTRACTION  ####################
 	if [[ "$RESULT" -gt 0 ]]; then
+		LATITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude' -or 'latitude' -or 'Latitude Start'-element VALUE)
+		
 		LATITUDESTART=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude Start' -element VALUE)
+
 		LONGITUDESTART=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Longitude Start' -element VALUE)
-		LATITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Latitude' -or 'latitude' -element VALUE)
 		LONGITUDE=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'Longitude' -or 'longitude' -element VALUE)
 		#the  'geographic location (latitude and longitude)' retrieval is not always working...
 		LATLON=$(esearch -db sra -query $i | efetch -format native | xtract -pattern SAMPLE_ATTRIBUTES -block SAMPLE_ATTRIBUTE -if TAG -equals 'lat_lon' -or 'geographic location (latitude and longitude)' -element VALUE)
 
-		echo "$i"_"$LATITUDESTART"_"$LONGITUDESTART"_"$LATITUDE"_"$LONGITUDE"_"$LATLON" >> $GPS_f
+		echo "$i"$'\t'"$LATITUDESTART" "$LONGITUDESTART"@"$LATITUDE" "$LONGITUDE"@"$LATLON" | sed 's/ @ @//g' | sed 's/@ @//g' >> $GPS_f
 		echo "GPS coordinates stored in "$GPS_f
 	fi
+#MMP   echo "$i"_"$LATITUDESTART"_"$LONGITUDESTART"_"$LATITUDE"_"$LONGITUDE"_"$LATLON" >> $GPS_f
 
 	##########   READ EXTRACTION   ##################### 
 	for k in $(cat "$ALNLGT_f"); do
@@ -256,14 +263,13 @@ do
 			cat $FASTQ_f >> $UNPAIRED_READS_f
 		fi
 		##Append GPS info to blast results to create the Global Read Detail Table
-		cat "$BLAST_f" | grep "$i"."$k" |  awk ' {print $1"\t"$2"\t" $3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\t"$10"\t"$11"\t"$12"\t" "'$i'" "\t" "'$k'" "\t" "'$LONGITUDE'" "\t" "'$LATITUDE'"}' >> $GLOBAL_f
+   cat "$BLAST_f" | grep "$i"."$k" |  awk ' {print $1"\t"$2"\t" $3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\t"$10"\t"$11"\t"$12"\t" "'$i'" "\t" "'$k'" "\t" "'$LONGITUDE'" "\t" "'$LATITUDE'"}' >> $GLOBAL_f
 		##Disabled here ##### Convert to fasta
 		cat $FASTQ_f | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > $FASTQ_f.fasta
 	done
 
-
 	### Emptying cache after each run (could be modified to only keep runs matching query)
-	echo "Running cache-mgr"
+#	echo "Running cache-mgr"
 	cache-mgr -c
 	
 	###Check if file does not contain any fastq file (e.g. no reads were extracted), and delete if true
@@ -280,13 +286,15 @@ do
 		echo "" 
 	
 		##Feed estimate of results to global result file
-		y="$(ls "$INT_FOLDER" | wc -l)"
+		y="$(ls $INT_FOLDER/*fastq-dump | wc -l)"
 		## minus 2 to uncount blastid and blastres files --> count indiv reads fastq files
-		let "y -= 2"
+		#let "y -= 2"
 		echo ""$QUERY"_"$i"_"$y"_"$LATITUDE"_"$LONGITUDE"" | sed 's/_/\t/g' >> $COUNTS_f
 	fi
 done
 
+#UPdate GPS data into 
+#join --header -12 -a2 $GPS_f $COUNTS_f -o 2.1,2.2,2.3,1.2 -e >> /home/sa04mp/MoulinetteOutput/COUNT_GPS_join
 
 
 ###################################################   OTU SEARCH   ###########################################################
@@ -295,9 +303,7 @@ done
 #
 echo "" 
 echo "" 
-echo "" 
 echo "LAUNCHING USEARCH OTU CALLING (Default parameters accept singletons)"
-echo "" 
 echo "" 
 echo "" 
 
@@ -343,7 +349,7 @@ cat $USEARCH_merged_f | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else i
 
 
 
-# create global blastdb directory in the SraSST workspace, will include the db of differnt runs called by their IDs
+# create global blastdb directory in the SraSST workspace, will include the db of different runs called by their IDs
 DBFOLDER=$FOLDER/SraSSTblastdb
 mkdir $DBFOLDER
 TITLE=SraSST-"$ID"-otus
@@ -359,14 +365,17 @@ blastn -num_threads $NTHREADS -db $BLASTDB_ID -query $PAIRED_READS_R2_fa -max_ta
 blastn -num_threads $NTHREADS -db $BLASTDB_ID -query  $USEARCH_merged_fa -outfmt "6" -max_target_seqs 1 -out $USEARCH_merged_RETRIEVED
 
 
+
 ##Remote Blast of retrieved OTUs via nr - best hits in nr
 
 echo "Final Remote Blast of retrieved OTUs on NR - This might take a while ... up to 10 minutes"
 blastn -db nr -query $USEARCH_otus_f -max_target_seqs 1 -outfmt "6" -out $USEARCH_RETRIEVED -remote
 
-
-#BLASTDB=/media/data/BLASTDB
+BLASTDB=/media/data/BLASTDB
 #blastn -db nr -num_threads $NTHREADS -query $USEARCH_otus_f -max_target_seqs 1 -outfmt "6" -out $USEARCH_RETRIEVED
+
+
+
 
 ##Extracting organism names from hits retrieved in NR
 cat $USEARCH_RETRIEVED | cut -f2 > $USEARCH_otus_GIDS
@@ -376,7 +385,6 @@ for s in $(cat $USEARCH_otus_GIDS); do
  echo "$TAXLIN" >> $USEARCH_otus_GIDS_NAME 
  echo "processed "$s""
 done
-
 
 ####Warn user about cache size 
 end=`date +%s`
@@ -393,5 +401,6 @@ echo "You can find the Organism dESCRIPTION OF THOSE NR hits matching your OTUs 
 echo "You can now MAP your new OTUs to GPS coordinates via reciprocal blast on the retrived reads"
 echo "You can also run the tool again using the retrieved unique reads (usearch folder - unique -) to recursively broaden your search"
 echo "You're Welcome :-)"
+echo ""
 
 exit 0
