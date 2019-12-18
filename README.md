@@ -74,7 +74,7 @@ Firstly, and like with any metabarcoding approach, detecting an organism in a lo
 ### Usage
 
 ```
-bash ./SraSST.sh QUERY LIST PERCID MAXTARGET READCOVER EVALUE   
+bash ./Moulinette.sh -q QUERY -l LIST -p PERCID -n MAXTARGET -t READCOVER -e EVALUE -m NTHREADS -o OUPUTFOLDER  
 ```
 
 * QUERY = fasta query file 
@@ -83,6 +83,8 @@ bash ./SraSST.sh QUERY LIST PERCID MAXTARGET READCOVER EVALUE
 * MAXTARGET = maximum number of target sequences in vdb-blast parameter
 * READCOVER = percentage read cover for blast Alignment length filtering expressed in decimal (0.8)
 * EVALUE = VDB-Blast e-value parameter
+* NTHREADS = Number of Threads
+* OUTPUTFOLDER = Output folder
 
 ### Results
 

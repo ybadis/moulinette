@@ -1,6 +1,6 @@
 #!/bin/bash
 
-##	Release v11.7 03-12-19
+##	Release v12 18-12-19
 ##	Contact yacinebadis@sams.ac.uk
 
 
@@ -16,8 +16,8 @@
 ##### Data are stored in the ncbi/cache folder,  attention should be paid tokeep the cache folder under control. Per default, cache is emptied after each
 ##### run, this can be modified by switching cache option -c (clear) to -r (read) near line 264. 
 
-### Usage:  bash ./SraSST-v7.sh $1 $2 $3 $4 $5 $6   
-### Usage example for metabarcoding runs: bash ./SraSST-v7.sh query.fasta runlist.txt 98.5 100 0.8 1e-100
+### Usage:  bash ./Moulinette.sh $1 $2 $3 $4 $5 $6   
+### Usage example for metabarcoding runs: bash ./Moulinette.sh query.fasta runlist.txt 98.5 100 0.8 1e-100
 ### Query can be a multifasta
 
 ###OUTPUT will contain In One global SraSST run folder:
@@ -39,7 +39,7 @@ PATH="/opt/usearch/9.2.64:$PATH"
 #PATH="/opt/usearch/11.0.667:$PATH"
 PATH="/opt/ncbi-blast/2.9.0/bin:$PATH"
 
-NTHREADS=16
+NTHREADS=1
 
 get_GPS_coordinates()
 {
@@ -58,7 +58,7 @@ usage() {
 	echo "evalue: Blast evalue parameter"
 	echo "dir: output directory"
 	echo "Usage example for metabarcoding:"
-        echo "./SraSST.sh -q query.fa -l runlist.txt -t 98.5 -n 100 -p 0.8 -e 1e-100 -o out -m 16"
+        echo "./Moulinette.sh -q data/query.fa -l data/runlist.txt -t 98.5 -n 100 -p 0.8 -e 1e-100 -o tmp -m 16"
 	exit 1
 }
 
@@ -92,10 +92,11 @@ echo PERCID "$PERCID"  blast identity threshold
 echo MAXTARGET is "$MAXTARGET" "max number of target sequences in blast parameter"
 echo READCOVER is "$READCOVER"  "percentage read cover for blast algntlgt filtering"
 echo EVALUE is "$EVALUE"  "Blast evalue parameter"
+echo NTHREADS is "$NTHREADS"  "Number of threads"
 echo OUTPUT Folder is "$OUTPUTDIR"
 echo ""
 echo ""
-echo Launching SraSST RUN with "$RUNCOUNT" sra runs and $QUERYNB fasta query sequences
+echo Launching a Moulinette RUN with "$RUNCOUNT" sra runs and $QUERYNB fasta query sequences
 echo In Our hands, a single metagenomic run can typically take 0 to 15 min to scan with 9 queries
 echo THIS MIGHT BE LONG ...
 echo ""
@@ -260,6 +261,8 @@ do
 			LATITUDE=$(echo $DECIMAL | cut -d' ' -f1 )
 			LONGITUDE=$(echo $DECIMAL | cut -d' ' -f2 )
 		else
+			LATITUDE=None
+			LONGITUDE=None
 			echo "No GPS coordinates found"
 		fi
 		
