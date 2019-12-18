@@ -253,6 +253,7 @@ do
 			LATITUDE=$(get_GPS_coordinates $i 'Latitude Start');
 			LONGITUDE=$(get_GPS_coordinates $i 'Longitude Start');
 		fi
+
 		if [ -z $LATITUDE ];
 		then
 			#'geographic location (latitude and longitude)'
@@ -260,15 +261,17 @@ do
 			DECIMAL=$(echo $COORDINATES | awk '{ print $1$2,$3$4 }'| GeoConvert)
 			LATITUDE=$(echo $DECIMAL | cut -d' ' -f1 )
 			LONGITUDE=$(echo $DECIMAL | cut -d' ' -f2 )
-		else
+		fi
+		
+		if [ -z $LATITUDE ];
+		then
 			LATITUDE=None
 			LONGITUDE=None
 			echo "No GPS coordinates found"
+		else	
+			echo "Latitude: "$LATITUDE
+			echo "Longitude: "$LONGITUDE
 		fi
-		
-			
-		echo "Latitude: "$LATITUDE
-		echo "Longitude: "$LONGITUDE
 
 		echo -e "$i"'\t'"$LATITUDE"'\t'"$LONGITUDE" >> $GPS_f
 		echo "GPS coordinates stored in "$GPS_f
