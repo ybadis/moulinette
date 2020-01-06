@@ -67,17 +67,20 @@ Firstly, and like with any metabarcoding approach, detecting an organism in a lo
 
 ### Installation Requirements
 
-* SRAtoolkit (sratoolkit.2.8.0-centos_linux64)
-* entrezdirect tools (September2016 package)
-* usearch (usearch v9.1.13_i86linux32, free academic license)
+* SRAtoolkit (tested with sratoolkit.2.8.0-centos_linux64)
+* entrezdirect tools (tested with September2016 package)
+* usearch (tested with v9.1.13_i86linux32, free academic license)
 
 ### Usage
 
+A query QUERY is run against a list of SRA Runs LIST. For each run, the query is vdb-blasted on the Run and Reads above the selected alignment length threshholds are retrieved in fastq and converted to fasta in separate folders corresponding to each SRA Run.
+A Final result fastq file and count file is generated. Runs with no hits should not be saved.
+
 ```
-bash ./Moulinette.sh -q QUERY -l LIST -p PERCID -n MAXTARGET -t READCOVER -e EVALUE -m NTHREADS -o OUPUTFOLDER  
+./Moulinette.sh -q QUERY -l LIST -p PERCID -n MAXTARGET -t READCOVER -e EVALUE -m NTHREADS -o OUPUTFOLDER  
 ```
 
-* QUERY = fasta query file 
+* QUERY = fasta query file (could also be a multifasta)
 * LIST = name of input list of SRA Runs in txt format (e.g runselector output on ncbi, ERR867907) 
 * PERCID = blast identity threshold
 * MAXTARGET = maximum number of target sequences in vdb-blast parameter
@@ -85,6 +88,31 @@ bash ./Moulinette.sh -q QUERY -l LIST -p PERCID -n MAXTARGET -t READCOVER -e EVA
 * EVALUE = VDB-Blast e-value parameter
 * NTHREADS = Number of Threads
 * OUTPUTFOLDER = Output folder
+
+**Example**
+
+```
+./Moulinette.sh -q data/query.fa -l data/runlist.txt -p 0.8 -n 100 -t 98.5 -e 1e-100 -m 16 -o tmp  
+```
+
+**Output**
+The output folder will contain a SraSST run with a timestamp. Inside you will find:
+
+* A folder with copies of the QUERY and LIST files.
+* a log file summarizing results and parameters used for the run (*.log)
+* a global count table summarizing the number of read pairs retrieved for each positive run (*counts.tab)
+* a global fastq file pooling all retrieved reads (*All-retrieved-reads-paired.fastq)
+* a global table containg GPS coordinates of every positive sra run (If such metadata were provided by submitters to sra)
+* a folder containg the whole usearch outputs generated (*-usearch folder, the final otu file has the *otus.fa suffix)
+* a folder for each positive run containing (i) blast results (ii) selected ids (iii) a fastq file for each extracted read pair
+
+
+
+**Notes** 
+
+* Stream of data does not mean data are not in cache. Up to a certain extent, keeping cache data allows extra fast retrieval on RUNs that were already queried --> interesting when automated with Many queries following intial scan of a bif runlist file.
+* Data are stored in the ncbi/cache folder,  attention should be paid to keep the cache folder under control. By default, cache is emptied after each run, this can be modified by switching cache option -c (clear) to -r (read).
+
 
 ### Results
 
