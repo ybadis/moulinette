@@ -6,12 +6,10 @@
 ##Enter Debug mode (deactivated here)
 #set -x
 
-PATH="/opt/sratoolkit/2.9.6/bin:$PATH"
+PATH="/opt/sratoolkit/2.10.5/bin:$PATH"
 PATH="/opt/edirect:$PATH"
-#PATH="/opt/usearch/9.1.13:$PATH"
-PATH="/opt/usearch/9.2.64:$PATH"
-#PATH="/opt/usearch/11.0.667:$PATH"
-PATH="/opt/ncbi-blast/2.9.0/bin:$PATH"
+PATH="/opt/usearch/9.2.64:$PATH" # latest version 11.0.667
+PATH="/opt/ncbi-blast/2.10.0+/bin:$PATH"
 
 NTHREADS=1
 
@@ -102,7 +100,8 @@ start=`date +%s`  #Measuring time
 
 
 ## Generate uniq SraSST Runid based on date hour min sec - Thi ID will be USED in filename
-ID=$(date | awk '{print $6$2$3$4}' | sed 's/://g' )
+#ID=$(date | awk '{print $6$2$3$4}' | sed 's/://g' )
+ID=$(date +%Y%m%d_%H%M%S)
 
 ## CreateDirectoryStructure - GlobalResultFile - GlobalGPScoordinates
 RUN=SraSST-"$ID"
