@@ -6,7 +6,7 @@
 ##Enter Debug mode (deactivated here)
 #set -x
 
-PATH="/opt/sratoolkit/2.10.5/bin:$PATH"
+PATH="/opt/sratoolkit/2.9.6/bin:$PATH" # latest version 2.10.5
 PATH="/opt/edirect:$PATH"
 PATH="/opt/usearch/9.2.64:$PATH" # latest version 11.0.667
 PATH="/opt/ncbi-blast/2.10.0+/bin:$PATH"
